@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>תפוס את העיגול</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    color: #fff;
+    user-select: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 24px;
+    font-size: 22px;
+    font-weight: bold;
+    z-index: 2;
+  }
+  #circle {
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #fde047, #f97316);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.7);
+    cursor: pointer;
+    transition: transform 0.1s;
+    display: none;
+  }
+  #circle:active { transform: scale(0.9); }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 3;
+    text-align: center;
+    padding: 16px;
+  }
+  #overlay h1 { margin: 0; font-size: 42px; }
+  #overlay p { margin: 0; font-size: 20px; }
+  button {
+    font-size: 22px;
+    padding: 12px 36px;
+    border: none;
+    border-radius: 12px;
+    background: #f97316;
+    color: #fff;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button:hover { background: #ea580c; }
+  .pop {
+    position: absolute;
+    font-weight: bold;
+    font-size: 24px;
+    color: #fde047;
+    pointer-events: none;
+    animation: pop 0.6s ease-out forwards;
+  }
+  @keyframes pop {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-40px); }
+  }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div>נקודות: <span id="score">0</span></div>
+  <div>שיא: <span id="best">0</span></div>
+  <div>זמן: <span id="time">30</span></div>
+</div>
+
+<div id="circle"></div>
+
+<div id="overlay">
+  <h1>תפוס את העיגול!</h1>
+  <p id="message">לחץ על העיגול כמה שיותר פעמים ב־30 שניות.<br>ככל שתצבור יותר נקודות — הוא יקפוץ מהר יותר ויקטן.</p>
+  <button id="startBtn">התחל</button>
+</div>
+
+<script>
+  const GAME_SECONDS = 30;
+
+  const circle = document.getElementById('circle');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const timeEl = document.getElementById('time');
+  const overlay = document.getElementById('overlay');
+  const message = document.getElementById('message');
+  const startBtn = document.getElementById('startBtn');
+
+  let score = 0;
+  let timeLeft = GAME_SECONDS;
+  let jumpTimer = null;
+  let clockTimer = null;
+  let best = 0;
+  try { best = Number(localStorage.getItem('circleBest')) || 0; } catch (e) {}
+  bestEl.textContent = best;
+
+  function circleSize() {
+    return Math.max(30, 70 - score * 1.5);
+  }
+
+  function jumpDelay() {
+    return Math.max(450, 1200 - score * 30);
+  }
+
+  function moveCircle() {
+    const size = circleSize();
+    circle.style.width = size + 'px';
+    circle.style.height = size + 'px';
+    const top = 70; // leave room for the HUD
+    const x = Math.random() * (window.innerWidth - size);
+    const y = top + Math.random() * (window.innerHeight - size - top);
+    circle.style.left = x + 'px';
+    circle.style.top = y + 'px';
+
+    clearTimeout(jumpTimer);
+    jumpTimer = setTimeout(moveCircle, jumpDelay());
+  }
+
+  function showPop(x, y) {
+    const el = document.createElement('div');
+    el.className = 'pop';
+    el.textContent = '+1';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 600);
+  }
+
+  circle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    score++;
+    scoreEl.textContent = score;
+    showPop(e.clientX, e.clientY);
+    moveCircle();
+  });
+
+  function startGame() {
+    score = 0;
+    timeLeft = GAME_SECONDS;
+    scoreEl.textContent = score;
+    timeEl.textContent = timeLeft;
+    overlay.style.display = 'none';
+    circle.style.display = 'block';
+    moveCircle();
+
+    clockTimer = setInterval(() => {
+      timeLeft--;
+      timeEl.textContent = timeLeft;
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+  }
+
+  function endGame() {
+    clearInterval(clockTimer);
+    clearTimeout(jumpTimer);
+    circle.style.display = 'none';
+
+    let text = 'צברת ' + score + ' נקודות.';
+    if (score > best) {
+      best = score;
+      bestEl.textContent = best;
+      try { localStorage.setItem('circleBest', best); } catch (e) {}
+      text += '<br>🏆 שיא חדש!';
+    }
+    message.innerHTML = text;
+    overlay.querySelector('h1').textContent = 'נגמר הזמן!';
+    startBtn.textContent = 'שחק שוב';
+    overlay.style.display = 'flex';
+  }
+
+  startBtn.addEventListener('click', startGame);
+</script>
+</body>
+</html>
